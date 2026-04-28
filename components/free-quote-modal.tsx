@@ -79,7 +79,7 @@ ${details}
     `.trim()
 
     const mailtoUrl = buildMailtoUrl({
-      to: "contact@stonehavenhrm.ca",
+      to: "umer.ilyas@brandsurge.io",
       replyTo: contact,
       subject: subjectMap[language] || subjectMap.en,
       body: body,
