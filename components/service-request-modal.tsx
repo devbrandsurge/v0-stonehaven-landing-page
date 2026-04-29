@@ -8,7 +8,6 @@ import { useLanguage } from "@/contexts/language-context"
 import { SimpleToast } from "@/components/simple-toast"
 import { buildMailtoUrl } from "@/lib/email"
 
-// GTM Data Layer helper — defined at module level, same as FreeQuoteModal
 declare global {
   interface Window {
     dataLayer: Record<string, unknown>[]
@@ -16,6 +15,7 @@ declare global {
 }
 
 const pushDataLayer = (data: Record<string, unknown>) => {
+  if (typeof window === "undefined") return
   window.dataLayer = window.dataLayer || []
   window.dataLayer.push(data)
 }
@@ -54,8 +54,16 @@ export function ServiceRequestModal({ isOpen, onClose }: ServiceRequestModalProp
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Fire modal_opened ONCE when isOpen flips true — not on every render.
+  useEffect(() => {
+    if (!isOpen) return
+    pushDataLayer({
+      event: "service_request_modal_opened",
+      service_request_language: language,
+    })
+  }, [isOpen, language])
+
   const handleClose = () => {
-    // GTM Event: user dismissed the modal
     pushDataLayer({
       event: "service_request_modal_closed",
       service_request_service_type: selectedService || "not_selected",
@@ -75,9 +83,10 @@ export function ServiceRequestModal({ isOpen, onClose }: ServiceRequestModalProp
     const email = formData.get("email") as string
     const phone = formData.get("phone") as string
     const address = formData.get("address") as string
-    const details = formData.get("details") as string
+    const details = (formData.get("details") as string) ?? ""
 
-    const selectedServiceLabel = services.find((s) => s.value === selectedService)?.label || selectedService
+    const selectedServiceLabel =
+      services.find((s) => s.value === selectedService)?.label || selectedService
 
     const subjectMap: Record<string, string> = {
       en: `Service Request - ${selectedServiceLabel}`,
@@ -105,28 +114,24 @@ ${details}
       body: body,
     })
 
-    // GTM Event: form submitted successfully — mirrors quote_form_submitted pattern
+    // The event GTM is listening for.
     pushDataLayer({
-      event: "service_request_submitted",
+      event: "service_request",
       service_request_service_type: selectedService,
       service_request_service_label: selectedServiceLabel,
       service_request_language: language,
       service_request_has_details: details.trim().length > 0,
     })
 
-    window.open(mailtoUrl, "_blank")
+    // Let GTM flush before the mailto handoff.
+    setTimeout(() => {
+      window.open(mailtoUrl, "_blank")
+    }, 0)
+
     setShowToast(true)
     setTimeout(() => {
       handleClose()
     }, 2000)
-  }
-
-  // GTM Event: modal opened — same pattern as FreeQuoteModal
-  if (isOpen) {
-    pushDataLayer({
-      event: "service_request_modal_opened",
-      service_request_language: language,
-    })
   }
 
   if (!isOpen) return null
@@ -242,7 +247,6 @@ ${details}
                           onClick={() => {
                             setSelectedService(service.value)
                             setIsDropdownOpen(false)
-                            // GTM Event: service selected from dropdown
                             pushDataLayer({
                               event: "service_request_service_selected",
                               service_request_service_type: service.value,
