@@ -13,6 +13,13 @@ interface ServiceRequestModalProps {
   onClose: () => void
 }
 
+// Extend Window to include dataLayer for GTM
+declare global {
+  interface Window {
+    dataLayer: Record<string, unknown>[]
+  }
+}
+
 export function ServiceRequestModal({ isOpen, onClose }: ServiceRequestModalProps) {
   const { t, language } = useLanguage()
   const [showToast, setShowToast] = useState(false)
@@ -45,6 +52,14 @@ export function ServiceRequestModal({ isOpen, onClose }: ServiceRequestModalProp
   const handleClose = () => {
     setSelectedService("")
     onClose()
+  }
+
+  const pushToDataLayer = (eventName: string, payload: Record<string, unknown>) => {
+    window.dataLayer = window.dataLayer || []
+    window.dataLayer.push({
+      event: eventName,
+      ...payload,
+    })
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -87,6 +102,17 @@ ${details}
     })
 
     window.open(mailtoUrl, "_blank")
+
+    // ✅ GTM dataLayer push on successful form submission
+    pushToDataLayer("service_request_submitted", {
+      form_name: "service_request_modal",
+      service_type: selectedService,
+      service_label: selectedServiceLabel,
+      language: language,
+      user_email: email,        // remove if PII is a concern
+      user_phone: phone,        // remove if PII is a concern
+    })
+
     setShowToast(true)
     setTimeout(() => {
       handleClose()
